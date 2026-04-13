@@ -5,9 +5,6 @@ import definePlugin, { PluginNative } from "@utils/types";
 const logger = new Logger("BypassFileLimit");
 let Native: PluginNative<typeof import("./native")>;
 
-// Magic udta buffer that marks MP4 files as "clips" to Discord's backend, bypassing the Nitro check
-const udtaBuffer = new Uint8Array([0, 0, 0, 89, 109, 101, 116, 97, 0, 0, 0, 0, 0, 0, 0, 33, 104, 100, 108, 114, 0, 0, 0, 0, 0, 0, 0, 0, 109, 100, 105, 114, 97, 112, 112, 108, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 44, 105, 108, 115, 116, 0, 0, 0, 36, 169, 116, 111, 111, 0, 0, 0, 28, 100, 97, 116, 97, 0, 0, 0, 1, 0, 0, 0, 0, 76, 97, 118, 102, 54, 49, 46, 51, 46, 49, 48, 51, 0, 0, 46, 46, 117, 117, 105, 100, 161, 200, 82, 153, 51, 70, 77, 184, 136, 240, 131, 245, 122, 117, 165, 239]);
-
 /**
  * Robust monkey-patching utility that handles descriptors and nested properties.
  */
@@ -190,18 +187,13 @@ export default definePlugin({
         }
 
         /**
-         * Core binary spoofing logic: Appends udta buffer and adds Clip metadata to MP4s.
+         * Core logic: Injects Clip metadata into file upload properties.
          */
         const spoofFile = async (fileObj: any) => {
             const file = fileObj.file;
             if (file && file.size > 10 * 1024 * 1024 && file.name.toLowerCase().endsWith(".mp4")) {
                 logger.info(`Spoofing large video as clip: ${file.name} (${file.size} bytes)`);
                 try {
-                    const arrayBuffer = await file.arrayBuffer();
-                    const newBuffer = new Uint8Array(arrayBuffer.byteLength + udtaBuffer.length);
-                    newBuffer.set(new Uint8Array(arrayBuffer), 0);
-                    newBuffer.set(udtaBuffer, arrayBuffer.byteLength);
-
                     // Extract game name from filename (e.g., "PioneerGame_..." -> "PioneerGame")
                     // Strip spaces to match common exe naming conventions
                     const exeName = file.name.split('_')[0].replace(/\s/g, "");
@@ -219,7 +211,6 @@ export default definePlugin({
                         }
                     }
 
-                    fileObj.file = new File([newBuffer], file.name, { type: "video/mp4" });
                     fileObj.clip = {
                         id: ((BigInt(Date.now()) - 1420070400000n) << 22n).toString(), // Snowflake from current timestamp
                         version: 3,
@@ -233,7 +224,7 @@ export default definePlugin({
                         name: file.name.split(".").slice(0, -1).join(".")
                     };
                     fileObj.platform = 1; // Mark as Desktop
-                    logger.info(`Successfully spoofed file as clip with App ID: ${appId}`);
+                    logger.info(`Successfully set file upload properties as clip with App ID: ${appId}`);
                 } catch (e) {
                     logger.error("Error during clip spoofing:", e);
                 }
