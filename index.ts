@@ -1,5 +1,6 @@
 import { Logger } from "@utils/Logger";
 import { findByProps } from "@webpack";
+import { showToast as vencordShowToast, Toasts } from "@webpack/common";
 import definePlugin, { PluginNative } from "@utils/types";
 
 const logger = new Logger("BypassFileLimit");
@@ -18,12 +19,24 @@ export default definePlugin({
         const SelectedChannelStore = findByProps("getCurrentlySelectedChannelId");
         const UserStore = findByProps("getCurrentUser");
         const TokenStore = findByProps("getToken");
-        const Toasts = findByProps("showToast", "createToast");
 
         function showToast(title: string, type: number = 0) {
-            if (Toasts) {
-                Toasts.showToast(Toasts.createToast(title, type));
-            } else {
+            const toastType = type === 1
+                ? (Toasts?.Type?.SUCCESS ?? "success")
+                : type === 2
+                ? (Toasts?.Type?.FAILURE ?? "failure")
+                : (Toasts?.Type?.MESSAGE ?? "message");
+
+            try {
+                if (typeof vencordShowToast === "function") {
+                    vencordShowToast(title, toastType);
+                } else if (Toasts?.show && Toasts?.create) {
+                    Toasts.show(Toasts.create(title, toastType));
+                } else {
+                    logger.info(`Toast: ${title}`);
+                }
+            } catch (err) {
+                logger.error("Failed to show toast:", err);
                 logger.info(`Toast: ${title}`);
             }
         }
